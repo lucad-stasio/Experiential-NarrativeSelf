@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow-State Hard Interrupt Experiment v5.0</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .screen {
+            display: none;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .screen.active {
+            display: block;
+        }
+        
+        h1 {
+            color: #1a1a1a;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+        
+        p {
+            color: #4a4a4a;
+            margin-bottom: 20px;
+            line-height: 1.6;
+            font-size: 18px;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 32px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 16px;
+            margin: 20px 0;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 120px;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        
+        #game-area {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            background: #fafafa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+        
+        #dot, #flow-dot {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: #ff4444;
+            border-radius: 50%;
+            cursor: pointer;
+            display: none;
+            transition: transform 0.1s;
+        }
+        
+        #dot:hover, #flow-dot:hover {
+            transform: scale(1.1);
+        }
+        
+        .timer {
+            font-size: 20px;
+            font-weight: bold;
+            color: #007bff;
+            margin: 10px 0;
+        }
+        
+        .score {
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+            margin: 10px 0;
+        }
+        
+        .radio-group {
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .radio-option {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        
+        .radio-option:hover {
+            background: #e9ecef;
+        }
+        
+        .radio-option input[type="radio"] {
+            margin-right: 10px;
+        }
+        
+        .results-data {
+            text-align: left;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .results-data div {
+            margin: 8px 0;
+            word-wrap: break-word;
+        }
+        
+        .results-data strong {
+            color: #007bff;
+        }
+        
+        .divider {
+            margin: 15px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .question-text {
+            font-size: 20px;
+            font-weight: 500;
+            color: #1a1a1a;
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Screen 1: Welcome -->
+    <div id="screen-welcome" class="screen active">
+        <h1>Welcome to the Experiment</h1>
+        <p>You will play a reaction game and answer two questions.</p>
+        <button onclick="setupExperiment()">Start</button>
+    </div>
+    
+    <!-- Screen 2: Baseline Intro -->
+    <div id="screen-baseline-intro" class="screen">
+        <h1>Question 1</h1>
+        <p>First, please answer the following question.</p>
+        <button onclick="showBaselineTask()">Show Question</button>
+    </div>
+    
+    <!-- Screen 3: Baseline Task (Overhauled for v5.0) -->
+    <div id="screen-baseline-task" class="screen">
+        <h1>Please respond to this question:</h1>
+        <div class="question-text" id="baseline-question-text"></div>
+        <textarea id="baseline-textarea" placeholder="Type your answer here..."></textarea>
+        <button id="baseline-submit-btn" onclick="submitBaseline()">Submit</button>
+    </div>
+    
+    <!-- Screen 4: Calibration Intro -->
+    <div id="screen-calibration-intro" class="screen">
+        <h1>Reaction Game - Calibration</h1>
+        <p>You will now play a 3-minute reaction game. A red dot will appear. Click it as fast as you can before it disappears. The game will adapt to your skill level.</p>
+        <button onclick="startCalibrationGame()">Start Calibration</button>
+    </div>
+    
+    <!-- Screen 5: Calibration Task -->
+    <div id="screen-calibration-task" class="screen">
+        <h1>Click the Red Dot!</h1>
+        <div class="timer" id="calibration-timer">Time Left: 3:00</div>
+        <div id="game-area">
+            <div id="dot"></div>
+        </div>
+    </div>
+    
+    <!-- Screen 6: Flow Intro -->
+    <div id="screen-flow-intro" class="screen">
+        <h1>Reaction Game - Final Round</h1>
+        <p>Great! Now you will play for 3 more minutes. The game will be locked at your optimal speed. Try to get the highest score possible.</p>
+        <button onclick="startFlowGame()">Start Flow Game</button>
+    </div>
+    
+    <!-- Screen 7: Flow Task -->
+    <div id="screen-flow-task" class="screen">
+        <h1>Get the Highest Score!</h1>
+        <div class="timer" id="flow-timer">Time Left: 3:00</div>
+        <div class="score">Score: <span id="score-display">0</span></div>
+        <div id="game-area">
+            <div id="flow-dot"></div>
+        </div>
+    </div>
+    
+    <!-- Screen 8: Interrupt Task (Overhauled for v5.0) -->
+    <div id="screen-interrupt-task" class="screen">
+        <h1>Please respond to this question:</h1>
+        <div class="question-text" id="interrupt-question-text"></div>
+        <textarea id="interrupt-textarea" placeholder="Type your answer here..."></textarea>
+        <button id="interrupt-submit-btn" onclick="submitInterrupt()">Submit</button>
+    </div>
+    
+    <!-- Screen 9: Post Survey -->
+    <div id="screen-post-survey" class="screen">
+        <h1>Final Questions</h1>
+        <p>You're almost done. Please answer two final questions.</p>
+        
+        <p><strong>You gave two responses:</strong></p>
+        <p>Response 1: <span id="response1-preview"></span></p>
+        <p>Response 2: <span id="response2-preview"></span></p>
+        
+        <div class="radio-group">
+            <p><strong>Which of these two responses felt easier to generate?</strong></p>
+            <div class="radio-option">
+                <input type="radio" name="easier" value="1" id="easier1">
+                <label for="easier1">Response 1</label>
+            </div>
+            <div class="radio-option">
+                <input type="radio" name="easier" value="2" id="easier2">
+                <label for="easier2">Response 2</label>
+            </div>
+        </div>
+        
+        <div class="radio-group">
+            <p><strong>Which of these two responses feels more authentically 'you'?</strong></p>
+            <div class="radio-option">
+                <input type="radio" name="authentic" value="1" id="authentic1">
+                <label for="authentic1">Response 1</label>
+            </div>
+            <div class="radio-option">
+                <input type="radio" name="authentic" value="2" id="authentic2">
+                <label for="authentic2">Response 2</label>
+            </div>
+        </div>
+        
+        <button onclick="finishExperiment()">Finish Experiment</button>
+    </div>
+    
+    <!-- Screen 10: Final Results -->
+    <div id="screen-final-results" class="screen">
+        <h1>Thank You!</h1>
+        <p>Here is your data:</p>
+        <div class="results-data" id="results-display"></div>
+    </div>
+    
+    <script>
+        // Global State Variables (v5.0 - Total Time Measurement)
+        let group;
+        let q1 = "List 5 words that describe your personality.";
+        let q2 = "List 5 of your most important personal values.";
+        let baselineQuestion, interruptQuestion;
+        let baselineAnswer, interruptAnswer;
+        let rt_start_time; // Temporary variable for start time
+        let baselineRT_ms, interruptRT_ms; // Store total time
+        let calibrationSamples = [];
+        let stableFlowTime;
+        let flowGameScore;
+        
+        // Additional game state
+        let calibrationTimer, flowTimer;
+        let dotTimeout;
+        let dotTimeLimit = 800;
+        let successesInARow = 0;
+        let calibrationStartTime;
+        
+        // Utility function to switch screens
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+        
+        // Counterbalancing Function
+        function setupExperiment() {
+            group = Math.random() < 0.5 ? 'A' : 'B';
+            
+            if (group === 'A') {
+                baselineQuestion = q1;
+                interruptQuestion = q2;
+            } else {
+                baselineQuestion = q2;
+                interruptQuestion = q1;
+            }
+            
+            showScreen('screen-baseline-intro');
+        }
+        
+        // Baseline Task (v5.0 - Total Time)
+        function showBaselineTask() {
+            showScreen('screen-baseline-task');
+            document.getElementById('baseline-question-text').textContent = baselineQuestion;
+            
+            // Start timing immediately when screen is shown
+            rt_start_time = performance.now();
+            
+            // Focus on textarea
+            document.getElementById('baseline-textarea').focus();
+        }
+        
+        function submitBaseline() {
+            // Calculate total time from screen show to submit
+            let rt_end_time = performance.now();
+            baselineRT_ms = rt_end_time - rt_start_time;
+            
+            // Store the answer
+            baselineAnswer = document.getElementById('baseline-textarea').value;
+            
+            // Transition to next screen
+            showScreen('screen-calibration-intro');
+        }
+        
+        // Calibration Game
+        function startCalibrationGame() {
+            showScreen('screen-calibration-task');
+            
+            // Reset variables
+            calibrationSamples = [];
+            dotTimeLimit = 800;
+            successesInARow = 0;
+            calibrationStartTime = Date.now();
+            
+            // Start 3-minute timer
+            let timeLeft = 180;
+            updateTimer('calibration-timer', timeLeft);
+            
+            calibrationTimer = setInterval(() => {
+                timeLeft--;
+                updateTimer('calibration-timer', timeLeft);
+                
+                if (timeLeft <= 0) {
+                    endCalibrationGame();
+                }
+            }, 1000);
+            
+            // Start spawning dots
+            spawnDot();
+        }
+        
+        function updateTimer(elementId, seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            document.getElementById(elementId).textContent = 
+                `Time Left: ${minutes}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        function spawnDot() {
+            const dot = document.getElementById('dot');
+            const gameArea = document.getElementById('game-area');
+            
+            // Random position
+            const maxX = gameArea.clientWidth - 40;
+            const maxY = gameArea.clientHeight - 40;
+            dot.style.left = Math.random() * maxX + 'px';
+            dot.style.top = Math.random() * maxY + 'px';
+            dot.style.display = 'block';
+            
+            // Set timeout for miss
+            dotTimeout = setTimeout(missDot, dotTimeLimit);
+            
+            // Set click handler
+            dot.onclick = clickDot;
+        }
+        
+        function clickDot() {
+            clearTimeout(dotTimeout);
+            document.getElementById('dot').style.display = 'none';
+            
+            successesInARow++;
+            
+            // Adaptive algorithm
+            if (successesInARow === 3) {
+                dotTimeLimit = Math.max(100, dotTimeLimit - 25);
+                successesInARow = 0;
+            }
+            
+            // Store sample if in last 60 seconds
+            const elapsed = Date.now() - calibrationStartTime;
+            if (elapsed >= 120000) { // Last 60 seconds
+                calibrationSamples.push(dotTimeLimit);
+            }
+            
+            // Spawn next dot after delay
+            setTimeout(spawnDot, 500);
+        }
+        
+        function missDot() {
+            document.getElementById('dot').style.display = 'none';
+            
+            successesInARow = 0;
+            dotTimeLimit += 25;
+            
+            // Store sample if in last 60 seconds
+            const elapsed = Date.now() - calibrationStartTime;
+            if (elapsed >= 120000) {
+                calibrationSamples.push(dotTimeLimit);
+            }
+            
+            // Spawn next dot after delay
+            setTimeout(spawnDot, 500);
+        }
+        
+        function endCalibrationGame() {
+            clearInterval(calibrationTimer);
+            clearTimeout(dotTimeout);
+            document.getElementById('dot').style.display = 'none';
+            
+            // Calculate stable flow time
+            if (calibrationSamples.length > 0) {
+                stableFlowTime = Math.round(
+                    calibrationSamples.reduce((a, b) => a + b, 0) / calibrationSamples.length
+                );
+            } else {
+                stableFlowTime = 500;
+            }
+            
+            showScreen('screen-flow-intro');
+        }
+        
+        // Flow Game
+        function startFlowGame() {
+            showScreen('screen-flow-task');
+            
+            flowGameScore = 0;
+            document.getElementById('score-display').textContent = '0';
+            
+            // Start 3-minute timer
+            let timeLeft = 180;
+            updateTimer('flow-timer', timeLeft);
+            
+            flowTimer = setInterval(() => {
+                timeLeft--;
+                updateTimer('flow-timer', timeLeft);
+                
+                if (timeLeft <= 0) {
+                    hardInterrupt();
+                }
+            }, 1000);
+            
+            // Start spawning dots with stable flow time
+            spawnFlowDot();
+        }
+        
+        function spawnFlowDot() {
+            const dot = document.getElementById('flow-dot');
+            const gameArea = document.querySelector('#screen-flow-task #game-area');
+            
+            // Random position
+            const maxX = gameArea.clientWidth - 40;
+            const maxY = gameArea.clientHeight - 40;
+            dot.style.left = Math.random() * maxX + 'px';
+            dot.style.top = Math.random() * maxY + 'px';
+            dot.style.display = 'block';
+            
+            // Set timeout for miss using stable flow time
+            dotTimeout = setTimeout(missFlowDot, stableFlowTime);
+            
+            // Set click handler
+            dot.onclick = clickFlowDot;
+        }
+        
+        function clickFlowDot() {
+            clearTimeout(dotTimeout);
+            document.getElementById('flow-dot').style.display = 'none';
+            
+            flowGameScore++;
+            document.getElementById('score-display').textContent = flowGameScore;
+            
+            // Spawn next dot after delay
+            setTimeout(spawnFlowDot, 500);
+        }
+        
+        function missFlowDot() {
+            document.getElementById('flow-dot').style.display = 'none';
+            
+            // Spawn next dot after delay
+            setTimeout(spawnFlowDot, 500);
+        }
+        
+        // CRITICAL: Hard Interrupt Function (v5.0 - Total Time)
+        function hardInterrupt() {
+            // Instantly kill the game
+            clearInterval(flowTimer);
+            clearTimeout(dotTimeout);
+            
+            // Instantly switch screens
+            document.getElementById('screen-flow-task').style.display = 'none';
+            document.getElementById('screen-interrupt-task').style.display = 'block';
+            document.getElementById('screen-interrupt-task').classList.add('active');
+            
+            // Setup interrupt question
+            document.getElementById('interrupt-question-text').textContent = interruptQuestion;
+            
+            // Start timing immediately
+            rt_start_time = performance.now();
+            
+            // Focus on textarea
+            document.getElementById('interrupt-textarea').focus();
+        }
+        
+        function submitInterrupt() {
+            // Calculate total time from interrupt to submit
+            let rt_end_time = performance.now();
+            interruptRT_ms = rt_end_time - rt_start_time;
+            
+            // Store the answer
+            interruptAnswer = document.getElementById('interrupt-textarea').value;
+            
+            // Setup post-survey
+            document.getElementById('response1-preview').textContent = baselineAnswer;
+            document.getElementById('response2-preview').textContent = interruptAnswer;
+            
+            showScreen('screen-post-survey');
+        }
+        
+        function finishExperiment() {
+            // Display results with v5.0 labels
+            const resultsHTML = `
+                <div><strong>Group:</strong> ${group}</div>
+                <div class="divider"></div>
+                <div><strong>Baseline Question:</strong> ${baselineQuestion}</div>
+                <div><strong>Baseline Total Time:</strong> ${Math.round(baselineRT_ms)} ms</div>
+                <div><strong>Your Answer:</strong> ${baselineAnswer}</div>
+                <div class="divider"></div>
+                <div><strong>Your 'Flow' Speed:</strong> ${stableFlowTime} ms</div>
+                <div><strong>Flow Game Score:</strong> ${flowGameScore}</div>
+                <div class="divider"></div>
+                <div><strong>Interrupt Question:</strong> ${interruptQuestion}</div>
+                <div><strong>Interrupt Total Time:</strong> ${Math.round(interruptRT_ms)} ms</div>
+                <div><strong>Your Answer:</strong> ${interruptAnswer}</div>
+            `;
+            
+            document.getElementById('results-display').innerHTML = resultsHTML;
+            showScreen('screen-final-results');
+        }
+    </script>
+</body>
+</html>
